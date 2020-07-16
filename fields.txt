@@ -1,0 +1,13 @@
+Access List Options - acl_op - Show ACL Details,Modify ACL
+Access List Name - show_details_acl_name - 
+Access List Name - modify_acl_name - 
+Action - modify_action - Add/Update,Delete
+Add ACL Statements - add_acl_statements
+ACL Statements to Remove - remove_acl_statements
+Apply To or Remove From Interface - acl_interface_application - Apply,Remove
+Apply Interface - apply_interface
+Apply ACL Direction - apply_direction - In,Out
+Remove Interface - remove_interface
+Remove ACL Direction - remove_direction - In,Out
+Apply to Multiple Switches? - multiple_devices_flag - Yes,No
+Switch IP Addresses - ip_addresses

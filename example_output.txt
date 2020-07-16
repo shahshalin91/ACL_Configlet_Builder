@@ -1,0 +1,65 @@
+ip access-list BlueBypassHosts
+   10 permit ip host 192.168.1.10 any
+!
+ip access-list BlueFirewallHosts
+   10 permit ip any host 192.168.1.10
+!
+ip access-list BlueFirewallHostsIn
+   10 permit ip host 192.168.1.10 any
+!
+ip access-list BluePrefix
+   10 permit ip any 192.168.1.0/24
+   20 permit ip any 192.168.2.0/24
+!
+ip access-list EncapBlueFirewallHosts
+   10 permit vxlan host 192.168.1.10 any
+!
+ip access-list citi
+   10 permit ip host 1.0.0.1 any
+!
+interface Ethernet1
+   ip access-group BluePrefix in
+!
+interface Ethernet52/1
+   ip access-group BlueFirewallHostsIn out
+!
+interface Vlan15
+   ip access-group citi out
+   ip access-group citi in
+! 
+--------------------------------------------------
+{
+  "ACL Definitions": {
+    "BlueBypassHosts": {
+      "10": "permit ip host 192.168.1.10 any"
+    }, 
+    "BlueFirewallHosts": {
+      "10": "permit ip any host 192.168.1.10"
+    }, 
+    "BlueFirewallHostsIn": {
+      "10": "permit ip host 192.168.1.10 any"
+    }, 
+    "BluePrefix": {
+      "10": "permit ip any 192.168.1.0/24", 
+      "20": "permit ip any 192.168.2.0/24"
+    }, 
+    "EncapBlueFirewallHosts": {
+      "10": "permit vxlan host 192.168.1.10 any"
+    }, 
+    "citi": {
+      "10": "permit ip host 1.0.0.1 any"
+    }
+  }, 
+  "Interface Details": {
+    "Ethernet1": [
+      "ip access-group BluePrefix in"
+    ], 
+    "Ethernet52/1": [
+      "ip access-group BlueFirewallHostsIn out"
+    ], 
+    "Vlan15": [
+      "ip access-group citi out", 
+      "ip access-group citi in"
+    ]
+  }
+}
