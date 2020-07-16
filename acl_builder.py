@@ -15,7 +15,7 @@ else:
     # Handle target environment that doesn't support HTTPS verification
     ssl._create_default_https_context = _create_unverified_https_context
 
-def acl_configlet_parser(acl_configlet_content):
+def parseACLConfiglet(acl_configlet_content):
     configlet_details = {"ACL Definitions": None, "Interface Details": None}
     config_sections = [section.strip() for section in acl_configlet_content.split("!") ]
     acls = OrderedDict()
