@@ -26,7 +26,7 @@ def parseACLConfiglet(acl_configlet_content):
         if acl_match:
             acl_content = OrderedDict()
             for statement in config_section.split("\n")[1:]:
-                acl_content[statement.lstrip().split(" ")[0]] = " ".join(statement.lstrip().split(" ")[1:])
+                acl_content[int(statement.lstrip().split(" ")[0])] = " ".join(statement.lstrip().split(" ")[1:])
             acls[acl_match.group(1)] = acl_content
 
         interface_match = re.match(r'interface\s+(.+)', config_section.split("\n")[0])
@@ -109,8 +109,24 @@ def CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, apply
 
             if acl_name in configlet_details_dict["ACL Definitions"].keys():
                 #Parse and update acl_name
-                pass
-                
+                #Delete statements from ACL
+                if acl_statements["Delete"] is not None:
+                    for k, v in acl_statements["Delete"].items():
+                        print k, "vs", configlet_details_dict["ACL Definitions"][acl_name].keys()
+                        if k in configlet_details_dict["ACL Definitions"][acl_name].keys():
+                            if configlet_details_dict["ACL Definitions"][acl_name][k] == v:
+                                del configlet_details_dict["ACL Definitions"][acl_name][k]
+                        else:
+                            print "Could not find statement '{} {}' within {} ACL in {}-ACLs".format(k, v, acl_name, device["hostname"])
+                #Add statements to ACL
+                if acl_statements["Add"] is not None:
+                    for k, v in acl_statements["Add"].items():
+                        if k not in configlet_details_dict["ACL Definitions"][acl_name]:
+                            configlet_details_dict["ACL Definitions"][acl_name][k] = v
+                        else:
+                            print "Error: Sequence number {} is already being used in {} for {}".format(k, acl_name, device["hostname"])
+                            return
+
             else:
                 #Create acl in configlet with acl_name, acl_statements, acl_interface, and acl_direction
                 if acl_statements["Add"] is not None:
