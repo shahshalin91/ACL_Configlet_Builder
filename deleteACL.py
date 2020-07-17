@@ -65,7 +65,8 @@ acl_configlet_details = {
   }
 }
 
-
-#print buildACLConfiglet(acl_configlet_details)
-#deleted_acl_configlet = DeleteACL("BluePrefix",acl_configlet_details)
-#print buildACLConfiglet(deleted_acl_configlet)
+print "#" *50
+print buildACLConfiglet(acl_configlet_details)
+deleted_acl_configlet = DeleteACL("BluePrefix",acl_configlet_details)
+print "#" *50
+print buildACLConfiglet(deleted_acl_configlet)
