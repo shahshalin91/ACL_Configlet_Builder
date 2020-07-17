@@ -253,23 +253,6 @@ def DeleteACL(acl_name, device_ips, server):
             print "Configlet does not exist for {} ".format(device["hostname"])
 
 
-	'''
-	#for each device 
-    #Get device object via CVP API call
-
-    #Check for existing acl configlet for that device - <hostname>-ACLs
-    if existing_acl_configlet:
-        #Parse configlet for acl_name
-        if acl_name_exists:
-            #Parse and delete acl_name
-            pass
-        else:
-            #Nothing to do config wise. Just throw message
-            pass
-    else:
-        #Nothing to do config wise. Just throw message
-        pass
-	'''
 
 acl_option = Form.getFieldById('acl_option').value
 
