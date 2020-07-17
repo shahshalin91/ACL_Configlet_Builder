@@ -1,6 +1,6 @@
 import json, re
 from collections import OrderedDict
-from cvplibrary import CVPGlobalVariables, GlobalVariableNames, SSHClient
+from cvplibrary import CVPGlobalVariables, GlobalVariableNames, SSHClient, SSHClientUser
 from cvplibrary import RestClient
 from cvplibrary import Form
 from cvplibrary import Device
@@ -58,6 +58,22 @@ def getConfiglet(configlet):
     else:
       return response
 
+def showAclNames():
+  user = SSHClientUser(CVPGlobalVariables.getValue(GlobalVariableNames.CVP_USERNAME), CVPGlobalVariables.getValue(GlobalVariableNames.CVP_PASSWORD))
+  sshclient = SSHClient(user, CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP))
+  cmd = 'sh ip access-lists | json'
+  resp = sshclient.executeCommand( cmd )
+  resp_json = json.loads(resp)
+  for i in  range(len(resp_json["aclList"])-1):
+    print(resp_json["aclList"][i]["name"])
+
+def showAclDetails(acl_name):
+  user = SSHClientUser(CVPGlobalVariables.getValue(GlobalVariableNames.CVP_USERNAME), CVPGlobalVariables.getValue(GlobalVariableNames.CVP_PASSWORD))
+  sshclient = SSHClient(user, CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP))
+  cmd = 'sh ip access-lists %s' %(acl_name)
+  resp = sshclient.executeCommand( cmd )
+  return resp
+
 def modifyACL(acl_name, modify_action, acl_statements, acl_interface_application, acl_interface, acl_direction, device_ips):
     if modify_action == "Create/Update":
         CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, acl_interface, acl_direction, device_ips)
@@ -67,7 +83,6 @@ def modifyACL(acl_name, modify_action, acl_statements, acl_interface_application
 def CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, acl_interface, acl_direction, device_ips):
     '''
     When creating ACL configlet, write ACL definition and ACL detail configuration first then write application of ACL to interface configuration second
-    '''
     
     #for each device 
     #Get device object via CVP API call
@@ -84,9 +99,11 @@ def CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, acl_i
 
     else:
         #Create configlet with acl_name, acl_statements, acl_interface, and acl_direction
+    '''
 
 def DeleteACL(acl_name, device_ips):
-    #for each device 
+	'''
+	#for each device 
     #Get device object via CVP API call
 
     #Check for existing acl configlet for that device - <hostname>-ACLs
@@ -100,7 +117,7 @@ def DeleteACL(acl_name, device_ips):
 
     else:
         #Nothing to do config wise. Just throw message
-
+	'''
 
 acl_option = Form.getFieldById('acl_option').value
 
@@ -133,13 +150,21 @@ if remove_acl_statements is not None:
 acl_interface_application = Form.getFieldById('acl_interface_application').value
 
 
-apply_interface = Form.getFieldById('apply_interface').value()
-#List containing 'In' and/or 'Out' 
-apply_direction = Form.getFieldById('apply_direction').value()
+apply_interface = None
+apply_direction = None
+remove_interface= None
+remove_direction = None
 
-remove_interface = Form.getFieldById('remove_interface').value()
-#List containing 'In' and/or 'Out' 
-remove_direction = Form.getFieldById('remove_direction').value()
+if acl_interface_application == "Apply":
+  apply_interface = Form.getFieldById('apply_interface').value()
+  #List containing 'In' and/or 'Out' 
+  apply_direction = Form.getFieldById('apply_direction').value()
+elif acl_interface_application == "Remove":
+  remove_interface = Form.getFieldById('remove_interface').value()
+  #List containing 'In' and/or 'Out' 
+  remove_direction = Form.getFieldById('remove_direction').value()
+else:
+  ""
 
 if apply_interface is not None:
   acl_interface = apply_interface
@@ -154,21 +179,24 @@ elif remove_direction is not None:
   acl_direction = remove_direction
 else:
   acl_direction = None
-  
 
-multiple_devices_flag = Form.getFieldById('multiple_devices_flag').value()
+multiple_devices_flag = None
+
+if acl_option == "Modify ACL":
+  multiple_devices_flag = Form.getFieldById('multiple_devices_flag').value()
+
 if multiple_devices_flag is None or multiple_devices_flag == "No":
-    device_ips = [ CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP) ]
+  device_ips = [ CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP) ]
 else:
-    device_ips = [ip.strip() for ip in Form.getFieldById('ip_addresses').value().split("\n") ] if Form.getFieldById('ip_addresses').value() is not None else None
+  device_ips = [ip.strip() for ip in Form.getFieldById('ip_addresses').value().split("\n") ] if Form.getFieldById('ip_addresses').value() is not None else None
 
 
 
 
 if acl_option == "Show ACL Names":
-    showAclNames(device_ips)
+  showAclNames()
 elif acl_option == "Show ACL Details":
-    showAclDetails(device_ips, acl_name)
+  print showAclDetails(acl_name)
 else:
-    modifyACL(acl_name, modify_action, acl_statements, acl_interface_application, acl_interface, acl_direction, device_ips)
-
+  modifyACL(acl_name, modify_action, acl_statements, acl_interface_application, acl_interface, acl_direction, device_ips)
+    
