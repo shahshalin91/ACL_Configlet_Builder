@@ -297,13 +297,13 @@ remove_interface= None
 remove_direction = None
 
 if acl_interface_application == "Apply":
-  apply_interface = Form.getFieldById('apply_interface').value()
+  apply_interface = Form.getFieldById('apply_interface').value
   #List containing 'In' and/or 'Out' 
-  apply_direction = Form.getFieldById('apply_direction').value()
+  apply_direction = Form.getFieldById('apply_direction').value
 elif acl_interface_application == "Remove":
-  remove_interface = Form.getFieldById('remove_interface').value()
+  remove_interface = Form.getFieldById('remove_interface').value
   #List containing 'In' and/or 'Out' 
-  remove_direction = Form.getFieldById('remove_direction').value()
+  remove_direction = Form.getFieldById('remove_direction').value
 else:
   ""
 
@@ -323,18 +323,14 @@ else:
 
 multiple_devices_flag = None
 
-'''
-#Giving error
 if acl_option == "Modify ACL":
-  multiple_devices_flag = Form.getFieldById('multiple_devices_flag').value()
+  multiple_devices_flag = Form.getFieldById('multiple_devices_flag').value
 
 if multiple_devices_flag is None or multiple_devices_flag == "No":
   device_ips = [ CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP) ]
 else:
-  device_ips = [ip.strip() for ip in Form.getFieldById('ip_addresses').value().split("\n") ] if Form.getFieldById('ip_addresses').value() is not None else None
-'''
+  device_ips = [ip.strip() for ip in Form.getFieldById('ip_addresses').value.split("\n") ] if Form.getFieldById('ip_addresses').value is not None else None
 
-device_ips = ["10.20.30.23","10.20.30.10","10.20.30.12"]
 
 
 if acl_option == "Show ACL Names":
