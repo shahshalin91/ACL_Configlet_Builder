@@ -1,7 +1,7 @@
 import json, re
 from collections import OrderedDict
 import cvp
-from cvplibrary import CVPGlobalVariables, GlobalVariableNames, SSHClient
+from cvplibrary import CVPGlobalVariables, GlobalVariableNames,  SSHClient, SSHClientUser
 from cvplibrary import RestClient
 from cvplibrary import Form
 from cvplibrary import Device
@@ -57,6 +57,42 @@ def buildACLConfiglet(acl_configlet_details):
         acl_configlet_content += "!\n"
     return acl_configlet_content
 
+def showAclNames(device_ips):
+    user = SSHClientUser(CVPGlobalVariables.getValue(GlobalVariableNames.CVP_USERNAME), CVPGlobalVariables.getValue(GlobalVariableNames.CVP_PASSWORD))
+    sshclient = SSHClient(user, device_ips[0])
+    cmd = 'sh ip access-lists | json'
+    resp = sshclient.executeCommand( cmd )
+    resp_json = json.loads(resp)
+    for i in  range(len(resp_json["aclList"])-1):
+        print(resp_json["aclList"][i]["name"])
+
+def showAclDetails(device_ips, acl_name):
+    output = ""
+    user = SSHClientUser(CVPGlobalVariables.getValue(GlobalVariableNames.CVP_USERNAME), CVPGlobalVariables.getValue(GlobalVariableNames.CVP_PASSWORD))
+    sshclient = SSHClient(user, device_ips[0])
+    cmd = 'sh ip access-lists %s' %(acl_name)
+    resp = sshclient.executeCommand( cmd )
+    output += resp + "\n"
+    cmd = 'sh ip access-lists %s summary | json' %(acl_name)
+    resp = json.loads(sshclient.executeCommand( cmd ) )
+    iface_data = OrderedDict()
+    for iface in resp["aclList"][0]["configuredEgressIntfs"]:
+        if iface["name"] in iface_data.keys():
+            iface_data[iface["name"]].append("ip access-group {} out".format(acl_name))
+        else:
+            iface_data[iface["name"]] = [ "ip access-group {} out".format(acl_name) ]
+    for iface in resp["aclList"][0]["configuredIngressIntfs"]:
+        if iface["name"] in iface_data.keys():
+            iface_data[iface["name"]].append("ip access-group {} in".format(acl_name))
+        else:
+            iface_data[iface["name"]] = [ "ip access-group {} in".format(acl_name) ]
+    for k, v in iface_data.items():
+        output += "interface {}\n".format(k)
+        for statement in v:
+            output += "   {}\n".format(statement)
+        output += "!\n"
+    print output
+
 def getConfiglet(configlet):
   # setup request to get device list configlet
   url='https://localhost/cvpservice/configlet/getConfigletByName.do?queryparam=&name=%s' % configlet;
@@ -88,7 +124,6 @@ def CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, apply
     for device in devices:
         if device["ipAddress"] in device_ips:
             target_switches.append(device)
-            break
 
     #for each device 
     for switch in target_switches:
@@ -190,22 +225,49 @@ def CreateOrUpdateACL(acl_name, acl_statements, acl_interface_application, apply
             print "Added {} to Configlets".format("{}-ACLs".format(device["hostname"]))
  
 
-def DeleteACL(acl_name, device_ips):
-    #for each device 
-    #Get device object via CVP API call
+def DeleteACL(acl_name, device_ips, server):
+    target_switches = []
+    devices = server.cvpService.getInventory()[0]
+    for device in devices:
+        if device["ipAddress"] in device_ips:
+            target_switches.append(device)
 
-    #Check for existing acl configlet for that device - <hostname>-ACLs
-    if existing_acl_configlet:
+    #for each device 
+    for switch in target_switches:
+        acl_to_delete = False
+        #Check for existing <hostname>-ACLs configlet
+        try:
+            #Configlet exists
+            configlet = server.getConfiglet("{}-ACLs".format(switch["hostname"]))
+        except:
+            #configlet does not exist
+            configlet = None
+
+        if configlet is not None:
         #Parse configlet for acl_name
-        if acl_name_exists:
-            #Parse and delete acl_name
-            pass
+            configlet_details_dict = parseACLConfiglet(configlet.config)
+            if acl_name in configlet_details_dict["ACL Definitions"].keys():
+                acl_to_delete = True
+                del configlet_details_dict["ACL Definitions"][acl_name]
+            for key,values in configlet_details_dict["Interface Details"].items():
+                for value in values:
+                    value = value.split(" ")[2]
+                    if acl_name == value:
+                        acl_to_delete = True
+                        configlet_details_dict["Interface Details"][key].remove(value)
+            #print json.dumps(configlet_details_dict, indent=2)
+            if acl_to_delete:
+                configlet_content = buildACLConfiglet(configlet_details_dict)
+                configlet.config = configlet_content
+                #print configlet.config
+                #Delete ACL Configlet
+                server.updateConfiglet(configlet)
+                print "Deleted ACL {} from {} configlet".format(acl_name , "{}-ACLs".format(switch["hostname"]))
+            else:
+                print "ACL {} doesn't exist in {} configlet".format(acl_name , "{}-ACLs".format(switch["hostname"]))
         else:
-            #Nothing to do config wise. Just throw message
-            pass
-    else:
-        #Nothing to do config wise. Just throw message
-        pass
+            print "Configlet does not exist for {} ".format(device["hostname"])
+
 
 acl_option = Form.getFieldById('acl_option').value
 
@@ -261,13 +323,11 @@ remove_directions = remove_direction.split(",") if remove_direction is not None 
 
   
 multiple_devices_flag = Form.getFieldById('multiple_devices_flag').value
-if multiple_devices_flag is None or multiple_devices_flag == "No":
+
+if multiple_devices_flag is None or "No" in multiple_devices_flag:
     device_ips = [ CVPGlobalVariables.getValue(GlobalVariableNames.CVP_IP) ]
 else:
     device_ips = [ip.strip() for ip in Form.getFieldById('ip_addresses').value.split("\n") ] if Form.getFieldById('ip_addresses').value is not None else None
-
-
-
 
 if acl_option == "Show ACL Names":
     showAclNames(device_ips)
