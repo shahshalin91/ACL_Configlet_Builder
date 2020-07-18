@@ -75,22 +75,22 @@ def showAclDetails(device_ips, acl_name):
     output += resp + "\n"
     cmd = 'sh ip access-lists %s summary | json' %(acl_name)
     resp = json.loads(sshclient.executeCommand( cmd ) )
-    iface_data = OrderedDict()
+    configured_egress_interfaces = []
+    configured_ingress_interfaces = []
     for iface in resp["aclList"][0]["configuredEgressIntfs"]:
-        if iface["name"] in iface_data.keys():
-            iface_data[iface["name"]].append("ip access-group {} out".format(acl_name))
-        else:
-            iface_data[iface["name"]] = [ "ip access-group {} out".format(acl_name) ]
+        configured_egress_interfaces.append(iface["name"])
     for iface in resp["aclList"][0]["configuredIngressIntfs"]:
-        if iface["name"] in iface_data.keys():
-            iface_data[iface["name"]].append("ip access-group {} in".format(acl_name))
-        else:
-            iface_data[iface["name"]] = [ "ip access-group {} in".format(acl_name) ]
-    for k, v in iface_data.items():
-        output += "interface {}\n".format(k)
-        for statement in v:
-            output += "   {}\n".format(statement)
-        output += "!\n"
+        configured_ingress_interfaces.append(iface["name"])
+
+    output += "Configured Egress Interfaces\n"
+    for iface in configured_egress_interfaces:
+        output += "  - {}\n".format(iface)
+    output += "\n"
+    output += "Configured Ingress Interfaces\n"
+    for iface in configured_ingress_interfaces:
+        output += "  - {}\n".format(iface)
+    output += "\n"
+
     print output
 
 def getConfiglet(configlet):
