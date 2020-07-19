@@ -16,6 +16,154 @@ else:
     # Handle target environment that doesn't support HTTPS verification
     ssl._create_default_https_context = _create_unverified_https_context
 
+class CVP():
+    """
+    Class to act as a CVP object.  Leverages REST API to execute CVP functions. 
+    """
+    def __init__(self, ip_address, username, password):
+        self.ip_address = ip_address
+        self.username = username
+        self.password = password
+        self.cvp_sesh = None
+
+    def login(self):
+        """
+        Returns a cvp session
+        """
+        payload = json.dumps({"userID": self.username, "password": self.password})
+        self.cvp_sesh = requests.Session()
+        self.cvp_sesh.post("https://{}/cvpservice/login/authenticate.do".format(self.ip_address), data=payload, verify=False)
+        return self.cvp_sesh
+
+    def logout(self):
+        """
+        Logs out fof a cvp session
+        """
+        self.cvp_sesh.post("https://{}/cvpservice/login/logout.do".format(self.ip_address), verify=False)
+        return self.cvp_sesh
+
+    def getInventory(self, provisioned=False):
+        """
+        Returns the inventory
+
+            provisioned ( bool ): Flag that will signal whether to retrieve the entire inventory or just provisioned devices
+
+        """
+        if provisioned == True:
+            provisioned = "true"
+        else:
+            provisioned = "false"
+        response = self.cvp_sesh.get("https://{}/cvpservice/inventory/devices?provisioned={}".format(self.ip_address, provisioned), verify=False)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print("Error retrieving inventory.")
+            print(response.text)
+            return None
+
+    def addConfiglet(self, configlet_name, config):
+        data = {"config": config, "name": configlet_name}
+        self.cvp_sesh.post("https://{}/cvpservice/configlet/addConfiglet.do".format(self.ip_address), verify=False, data=json.dumps(data))
+
+    def updateConfiglet(self, configlet_key, configlet_name, config):
+        data = {"config": config, "name": configlet_name, "key": configlet_key, "waitForTaskIds":False, "reconciled":False}
+        self.cvp_sesh.post("https://{}/cvpservice/configlet/updateConfiglet.do".format(self.ip_address), verify=False, data=json.dumps(data))
+
+    def getConfiglet(self, configlet_name):
+        response = self.cvp_sesh.get("https://{}/cvpservice/configlet/getConfigletByName.do?name={}".format(self.ip_address, configlet_name), verify=False)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print("Error retrieving configlet.")
+            print(response.text)
+            return None
+
+    def getConfigletsAppliedToDevice(self, device_id):
+        response = self.cvp_sesh.get("https://{}/cvpservice/provisioning/getConfigletsByNetElementId.do?netElementId={}&startIndex=0&endIndex=0".format(self.ip_address, device_id), verify=False)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print("Error retrieving configlets for {}.".format(device_id))
+            print(response.text)
+            return None
+    
+    def applyConfiglets(self, dev, new_configlets, create_task=True):
+        # Get all the configlets assigned to the device.
+        configlets = self.getConfigletsAppliedToDevice(dev['systemMacAddress'])["configletList"]
+
+        # Get a list of the names and keys of the configlets
+        cnames = []
+        ckeys = []
+        for configlet in configlets:
+            cnames.append(configlet['name'])
+            ckeys.append(configlet['key'])
+
+        # Add the new configlets to the end of the arrays
+        for entry in new_configlets:
+            cnames.append(entry['name'])
+            ckeys.append(entry['key'])
+
+        info = '%s: Configlet Assign: to Device %s' % ('Created by ACL Configlet Builder', dev['fqdn'])
+        info_preview = '<b>Configlet Assign:</b> to Device' + dev['fqdn']
+        data = {'data': [{'info': info,
+                          'infoPreview': info_preview,
+                          'note': '',
+                          'action': 'associate',
+                          'nodeType': 'configlet',
+                          'nodeId': '',
+                          'configletList': ckeys,
+                          'configletNamesList': cnames,
+                          'ignoreConfigletNamesList': [],
+                          'ignoreConfigletList': [],
+                          'configletBuilderList': [],
+                          'configletBuilderNamesList': [],
+                          'ignoreConfigletBuilderList': [],
+                          'ignoreConfigletBuilderNamesList': [],
+                          'toId': dev['systemMacAddress'],
+                          'toIdType': 'netelement',
+                          'fromId': '',
+                          'nodeName': '',
+                          'fromName': '',
+                          'toName': dev['fqdn'],
+                          'nodeIpAddress': dev['ipAddress'],
+                          'nodeTargetIpAddress': dev['ipAddress'],
+                          'childTasks': [],
+                          'parentTask': ''}]}
+        self._add_temp_action(data)
+        if create_task:
+            return self._save_topology_v2([])
+        return None
+
+    def _add_temp_action(self, data):
+        ''' Adds temp action that requires a saveTopology call to take effect.
+
+            Args:
+                data (dict): a data dict with a specific format for the
+                    desired action.
+
+                    Base Ex: data = {'data': [{specific key/value pairs}]}
+        '''
+        url = 'https://{}/cvpservice/provisioning/addTempAction.do?format=topology&queryParam=&nodeId=root'.format(self.ip_address)
+        self.cvp_sesh.post(url, data=json.dumps(data))
+
+    def _save_topology_v2(self, data):
+        ''' Confirms a previously created temp action.
+
+            Args:
+                data (list): a list that contains a dict with a specific
+                    format for the desired action. Our primary use case is for
+                    confirming existing temp actions so we most often send an
+                    empty list to confirm an existing temp action.
+
+            Returns:
+                response (dict): A dict that contains a status and a list of
+                    task ids created (if any).
+
+                    Ex: {u'data': {u'status': u'success', u'taskIds': []}}
+        '''
+        url = 'https://{}/cvpservice/provisioning/v2/saveTopology.do'.format(self.ip_address)
+        return self.cvp_sesh.post(url, data=json.dumps(data))
+
 def parseACLConfiglet(acl_configlet_content):
     configlet_details = {"ACL Definitions": None, "Interface Details": None}
     config_sections = [section.strip() for section in acl_configlet_content.split("!") ]
@@ -96,20 +244,6 @@ def showAclDetails(device_ips, acl_name):
     output += "\n"
 
     print output
-
-def getConfiglet(configlet):
-  # setup request to get device list configlet
-  url='https://localhost/cvpservice/configlet/getConfigletByName.do?queryparam=&name=%s' % configlet;
-  method= 'GET';
-  client= RestClient(url,method);
-  if client.connect():
-    # extract the config from configlet and convert to json data (dict)
-    response = json.loads(client.getResponse())
-    if "errorCode" in response:
-      print "! Problem Loading:%s - %s" %(configlet, response['errorMessage'])
-      return False
-    else:
-      return response
 
 def modifyACL(acl_name, modify_action, acl_statements, acl_interface_application, apply_interface, remove_interface, apply_directions, remove_directions, device_ips, preview_or_apply):
     server = cvp.Cvp('localhost')
